@@ -1,6 +1,8 @@
 MEGA Sync Client
 ================
 
+This is a fork to support running MEGASync on Linux aarch64
+
 Easy automated syncing between your computers and your MEGA cloud drive.
 
 This repository contains all the development history of the official sync client of MEGA:
@@ -72,7 +74,7 @@ https://mega.nz/#!T14B0Y4T!EXGg9dRtacgz9_vCUtVq5tj6C3PBpkOHgXG289EBxBM
 
 #### Requirements:
 
-* Using `gcc` compiler below version 5 might result in compiler errors. 
+* Using `gcc` compiler below version 5 might result in compiler errors.
 * Third party requirements vary depending on your system.
 
 
@@ -90,7 +92,7 @@ sudo apt-get install build-essential autoconf automake m4 libtool libtool-bin qt
 sudo apt-get install libnautilus-extension-dev
 ```
 
-Addition: for RPM based (e.g: Fedora): 
+Addition: for RPM based (e.g: Fedora):
 ```
 sudo dnf install libtool gcc-c++ c-ares-devel cryptopp-devel openssl-devel qt-devel sqlite-devel zlib-devel LibRaw-devel
 ```
