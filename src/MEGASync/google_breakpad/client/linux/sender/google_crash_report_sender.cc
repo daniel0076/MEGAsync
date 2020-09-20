@@ -28,9 +28,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "common/linux/google_crashdump_uploader.h"
-#include "third_party/linux/include/gflags/gflags.h"
 #include <string>
 #include <iostream>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 
 #include "common/using_std_string.h"
 
@@ -83,7 +84,7 @@ bool CheckForRequiredFlagsOrDie() {
   return true;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, true);
   if (!CheckForRequiredFlagsOrDie()) {
@@ -100,5 +101,5 @@ int main(int argc, char *argv[]) {
                                              FLAGS_crash_server,
                                              FLAGS_proxy_host,
                                              FLAGS_proxy_userpasswd);
-  g.Upload();
+  g.Upload(NULL, NULL, NULL);
 }

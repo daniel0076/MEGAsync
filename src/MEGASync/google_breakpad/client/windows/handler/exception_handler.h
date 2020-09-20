@@ -57,11 +57,9 @@
 #define CLIENT_WINDOWS_HANDLER_EXCEPTION_HANDLER_H__
 
 #include <stdlib.h>
-#include <Windows.h>
-#include <DbgHelp.h>
+#include <windows.h>
+#include <dbghelp.h>
 #include <rpc.h>
-#include <sstream>
-#include <QApplication>
 
 #pragma warning(push)
 // Disable exception handler warnings.
@@ -220,7 +218,7 @@ class ExceptionHandler {
 
   // Get and set the minidump path.
   wstring dump_path() const { return dump_path_; }
-  void set_dump_path(const wstring &dump_path) {
+  void set_dump_path(const wstring& dump_path) {
     dump_path_ = dump_path;
     dump_path_c_ = dump_path_.c_str();
     UpdateNextID();  // Necessary to put dump_path_ in next_minidump_path_.
@@ -239,8 +237,9 @@ class ExceptionHandler {
 
   // Convenience form of WriteMinidump which does not require an
   // ExceptionHandler instance.
-  static bool WriteMinidump(const wstring &dump_path,
-                            MinidumpCallback callback, void* callback_context);
+  static bool WriteMinidump(const wstring& dump_path,
+                            MinidumpCallback callback, void* callback_context,
+                            MINIDUMP_TYPE dump_type = MiniDumpNormal);
 
   // Write a minidump of |child| immediately.  This can be used to
   // capture the execution state of |child| independently of a crash.
@@ -251,7 +250,8 @@ class ExceptionHandler {
                                     DWORD child_blamed_thread,
                                     const wstring& dump_path,
                                     MinidumpCallback callback,
-                                    void* callback_context);
+                                    void* callback_context,
+                                    MINIDUMP_TYPE dump_type = MiniDumpNormal);
 
   // Get the thread ID of the thread requesting the dump (either the exception
   // thread or any other thread that called WriteMinidump directly).  This
@@ -263,6 +263,15 @@ class ExceptionHandler {
   bool get_handle_debug_exceptions() const { return handle_debug_exceptions_; }
   void set_handle_debug_exceptions(bool handle_debug_exceptions) {
     handle_debug_exceptions_ = handle_debug_exceptions;
+  }
+
+  // Controls behavior of EXCEPTION_INVALID_HANDLE.
+  bool get_consume_invalid_handle_exceptions() const {
+    return consume_invalid_handle_exceptions_;
+  }
+  void set_consume_invalid_handle_exceptions(
+      bool consume_invalid_handle_exceptions) {
+    consume_invalid_handle_exceptions_ = consume_invalid_handle_exceptions;
   }
 
   // Returns whether out-of-process dump generation is used or not.
@@ -298,17 +307,6 @@ class ExceptionHandler {
       CONST PMINIDUMP_EXCEPTION_INFORMATION ExceptionParam,
       CONST PMINIDUMP_USER_STREAM_INFORMATION UserStreamParam,
       CONST PMINIDUMP_CALLBACK_INFORMATION CallbackParam);
-
-  typedef BOOL (WINAPI *StackWalk64_type)(
-          DWORD MachineType,
-          HANDLE hProcess,
-          HANDLE hThread,
-          LPSTACKFRAME64 StackFrame,
-          PVOID ContextRecord,
-          PREAD_PROCESS_MEMORY_ROUTINE64 ReadMemoryRoutine,
-          PFUNCTION_TABLE_ACCESS_ROUTINE64 FunctionTableAccessRoutine,
-          PGET_MODULE_BASE_ROUTINE64 GetModuleBaseRoutine,
-          PTRANSLATE_ADDRESS_ROUTINE64 TranslateAddress);
 
   // Function pointer type for UuidCreate, which is looked up dynamically.
   typedef RPC_STATUS (RPC_ENTRY *UuidCreate_type)(UUID* Uuid);
@@ -485,6 +483,10 @@ class ExceptionHandler {
   // to not interfere with debuggers.
   bool handle_debug_exceptions_;
 
+  // If true, the handler will consume any EXCEPTION_INVALID_HANDLE exceptions.
+  // Leave this false (the default) to handle these exceptions as normal.
+  bool consume_invalid_handle_exceptions_;
+
   // Callers can request additional memory regions to be included in
   // the dump.
   AppMemoryList app_memory_info_;
@@ -511,8 +513,8 @@ class ExceptionHandler {
   static volatile LONG instance_count_;
 
   // disallow copy ctor and operator=
-  explicit ExceptionHandler(const ExceptionHandler &);
-  void operator=(const ExceptionHandler &);
+  explicit ExceptionHandler(const ExceptionHandler&);
+  void operator=(const ExceptionHandler&);
 };
 
 }  // namespace google_breakpad

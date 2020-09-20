@@ -30,6 +30,9 @@
 // A wrapper for libcurl to do HTTP Uploads, to support easy mocking
 // and unit testing of the HTTPUpload class.
 
+#ifndef COMMON_LINUX_LIBCURL_WRAPPER_H_
+#define COMMON_LINUX_LIBCURL_WRAPPER_H_
+
 #include <string>
 #include <map>
 
@@ -40,6 +43,7 @@ namespace google_breakpad {
 class LibcurlWrapper {
  public:
   LibcurlWrapper();
+  virtual ~LibcurlWrapper();
   virtual bool Init();
   virtual bool SetProxy(const string& proxy_host,
                         const string& proxy_userpwd);
@@ -47,11 +51,38 @@ class LibcurlWrapper {
                        const string& basename);
   virtual bool SendRequest(const string& url,
                            const std::map<string, string>& parameters,
-                           string* server_response);
+                           long* http_status_code,
+                           string* http_header_data,
+                           string* http_response_data);
+  bool SendGetRequest(const string& url,
+                      long* http_status_code,
+                      string* http_header_data,
+                      string* http_response_data);
+  bool SendPutRequest(const string& url,
+                      const string& path,
+                      long* http_status_code,
+                      string* http_header_data,
+                      string* http_response_data);
+  bool SendSimplePostRequest(const string& url,
+                             const string& body,
+                             const string& content_type,
+                             long* http_status_code,
+                             string* http_header_data,
+                             string* http_response_data);
+
  private:
   // This function initializes class state corresponding to function
   // pointers into the CURL library.
   bool SetFunctionPointers();
+
+  bool SendRequestInner(const string& url,
+                        long* http_status_code,
+                        string* http_header_data,
+                        string* http_response_data);
+
+  void Reset();
+
+  bool CheckInit();
 
   bool init_ok_;                 // Whether init succeeded
   void* curl_lib_;               // Pointer to result of dlopen() on
@@ -60,25 +91,29 @@ class LibcurlWrapper {
                                  // dealing
   // with CURL.
 
-  CURL *curl_;                   // Pointer for handle for CURL calls.
+  CURL* curl_;                   // Pointer for handle for CURL calls.
 
   CURL* (*easy_init_)(void);
 
   // Stateful pointers for calling into curl_formadd()
-  struct curl_httppost *formpost_;
-  struct curl_httppost *lastptr_;
-  struct curl_slist *headerlist_;
+  struct curl_httppost* formpost_;
+  struct curl_httppost* lastptr_;
+  struct curl_slist* headerlist_;
 
   // Function pointers into CURL library
-  CURLcode (*easy_setopt_)(CURL *, CURLoption, ...);
-  CURLFORMcode (*formadd_)(struct curl_httppost **,
-                           struct curl_httppost **, ...);
-  struct curl_slist* (*slist_append_)(struct curl_slist *, const char *);
-  void (*slist_free_all_)(struct curl_slist *);
-  CURLcode (*easy_perform_)(CURL *);
+  CURLcode (*easy_setopt_)(CURL*, CURLoption, ...);
+  CURLFORMcode (*formadd_)(struct curl_httppost**,
+                           struct curl_httppost**, ...);
+  struct curl_slist* (*slist_append_)(struct curl_slist*, const char*);
+  void (*slist_free_all_)(struct curl_slist*);
+  CURLcode (*easy_perform_)(CURL*);
   const char* (*easy_strerror_)(CURLcode);
-  void (*easy_cleanup_)(CURL *);
-  void (*formfree_)(struct curl_httppost *);
+  void (*easy_cleanup_)(CURL*);
+  CURLcode (*easy_getinfo_)(CURL*, CURLINFO info, ...);
+  void (*easy_reset_)(CURL*);
+  void (*formfree_)(struct curl_httppost*);
 
 };
 }
+
+#endif  // COMMON_LINUX_LIBCURL_WRAPPER_H_

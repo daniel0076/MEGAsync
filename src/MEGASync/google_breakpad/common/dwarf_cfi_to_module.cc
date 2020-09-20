@@ -105,6 +105,26 @@ vector<string> DwarfCFIToModule::RegisterNames::ARM() {
   return MakeVector(names, sizeof(names) / sizeof(names[0]));
 }
 
+// Per ARM IHI 0057A, section 3.1
+vector<string> DwarfCFIToModule::RegisterNames::ARM64() {
+  static const char *const names[] = {
+    "x0",  "x1",  "x2",  "x3",  "x4",  "x5",  "x6",  "x7",
+    "x8",  "x9",  "x10", "x11", "x12", "x13", "x14", "x15",
+    "x16", "x17", "x18", "x19", "x20", "x21", "x22", "x23",
+    "x24", "x25", "x26", "x27", "x28", "x29", "x30", "sp",
+    "",    "",    "",    "",    "",    "",    "",    "",
+    "",    "",    "",    "",    "",    "",    "",    "",
+    "",    "",    "",    "",    "",    "",    "",    "",
+    "",    "",    "",    "",    "",    "",    "",    "",
+    "v0",  "v1",  "v2",  "v3",  "v4",  "v5",  "v6",  "v7",
+    "v8",  "v9",  "v10", "v11", "v12", "v13", "v14", "v15",
+    "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23",
+    "v24", "v25", "v26", "v27", "v28", "v29", "v30", "v31"
+  };
+
+  return MakeVector(names, sizeof(names) / sizeof(names[0]));
+}
+
 vector<string> DwarfCFIToModule::RegisterNames::MIPS() {
   static const char* const kRegisterNames[] = {
     "$zero", "$at",  "$v0",  "$v1",  "$a0",   "$a1",  "$a2",  "$a3",
@@ -118,12 +138,12 @@ vector<string> DwarfCFIToModule::RegisterNames::MIPS() {
     "$f28",  "$f29", "$f30", "$f31", "$fcsr", "$fir"
   };
 
-  return MakeVector(kRegisterNames, 
+  return MakeVector(kRegisterNames,
                     sizeof(kRegisterNames) / sizeof(kRegisterNames[0]));
 }
 
-bool DwarfCFIToModule::Entry(size_t offset, uint64 address, uint64 length,
-                             uint8 version, const string &augmentation,
+bool DwarfCFIToModule::Entry(size_t offset, uint64_t address, uint64_t length,
+                             uint8_t version, const string& augmentation,
                              unsigned return_address) {
   assert(!entry_);
 
@@ -170,12 +190,12 @@ string DwarfCFIToModule::RegisterName(int i) {
 }
 
 void DwarfCFIToModule::Record(Module::Address address, int reg,
-                              const string &rule) {
+                              const string& rule) {
   assert(entry_);
 
   // Place the name in our global set of strings, and then use the string
   // from the set. Even though the assignment looks like a copy, all the
-  // major std::string implementations use reference counting internally,
+  // major string implementations use reference counting internally,
   // so the effect is to have all our data structures share copies of rules
   // whenever possible. Since register names are drawn from a
   // vector<string>, register names are already shared.
@@ -189,20 +209,20 @@ void DwarfCFIToModule::Record(Module::Address address, int reg,
     entry_->rule_changes[address][RegisterName(reg)] = shared_rule;
 }
 
-bool DwarfCFIToModule::UndefinedRule(uint64 address, int reg) {
+bool DwarfCFIToModule::UndefinedRule(uint64_t address, int reg) {
   reporter_->UndefinedNotSupported(entry_offset_, RegisterName(reg));
   // Treat this as a non-fatal error.
   return true;
 }
 
-bool DwarfCFIToModule::SameValueRule(uint64 address, int reg) {
+bool DwarfCFIToModule::SameValueRule(uint64_t address, int reg) {
   ostringstream s;
   s << RegisterName(reg);
   Record(address, reg, s.str());
   return true;
 }
 
-bool DwarfCFIToModule::OffsetRule(uint64 address, int reg,
+bool DwarfCFIToModule::OffsetRule(uint64_t address, int reg,
                                   int base_register, long offset) {
   ostringstream s;
   s << RegisterName(base_register) << " " << offset << " + ^";
@@ -210,7 +230,7 @@ bool DwarfCFIToModule::OffsetRule(uint64 address, int reg,
   return true;
 }
 
-bool DwarfCFIToModule::ValOffsetRule(uint64 address, int reg,
+bool DwarfCFIToModule::ValOffsetRule(uint64_t address, int reg,
                                      int base_register, long offset) {
   ostringstream s;
   s << RegisterName(base_register) << " " << offset << " +";
@@ -218,7 +238,7 @@ bool DwarfCFIToModule::ValOffsetRule(uint64 address, int reg,
   return true;
 }
 
-bool DwarfCFIToModule::RegisterRule(uint64 address, int reg,
+bool DwarfCFIToModule::RegisterRule(uint64_t address, int reg,
                                     int base_register) {
   ostringstream s;
   s << RegisterName(base_register);
@@ -226,15 +246,15 @@ bool DwarfCFIToModule::RegisterRule(uint64 address, int reg,
   return true;
 }
 
-bool DwarfCFIToModule::ExpressionRule(uint64 address, int reg,
-                                      const string &expression) {
+bool DwarfCFIToModule::ExpressionRule(uint64_t address, int reg,
+                                      const string& expression) {
   reporter_->ExpressionsNotSupported(entry_offset_, RegisterName(reg));
   // Treat this as a non-fatal error.
   return true;
 }
 
-bool DwarfCFIToModule::ValExpressionRule(uint64 address, int reg,
-                                         const string &expression) {
+bool DwarfCFIToModule::ValExpressionRule(uint64_t address, int reg,
+                                         const string& expression) {
   reporter_->ExpressionsNotSupported(entry_offset_, RegisterName(reg));
   // Treat this as a non-fatal error.
   return true;
@@ -254,7 +274,7 @@ void DwarfCFIToModule::Reporter::UnnamedRegister(size_t offset, int reg) {
 }
 
 void DwarfCFIToModule::Reporter::UndefinedNotSupported(size_t offset,
-                                                       const string &reg) {
+                                                       const string& reg) {
   fprintf(stderr, "%s, section '%s': "
           "the call frame entry at offset 0x%zx sets the rule for "
           "register '%s' to 'undefined', but the Breakpad symbol file format"
@@ -263,7 +283,7 @@ void DwarfCFIToModule::Reporter::UndefinedNotSupported(size_t offset,
 }
 
 void DwarfCFIToModule::Reporter::ExpressionsNotSupported(size_t offset,
-                                                         const string &reg) {
+                                                         const string& reg) {
   fprintf(stderr, "%s, section '%s': "
           "the call frame entry at offset 0x%zx uses a DWARF expression to"
           " describe how to recover register '%s', "

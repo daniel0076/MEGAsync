@@ -30,14 +30,15 @@
 // PDBSourceLineWriter uses a pdb file produced by Visual C++ to output
 // a line/address map for use with BasicSourceLineResolver.
 
-#ifndef _PDB_SOURCE_LINE_WRITER_H__
-#define _PDB_SOURCE_LINE_WRITER_H__
+#ifndef COMMON_WINDOWS_PDB_SOURCE_LINE_WRITER_H_
+#define COMMON_WINDOWS_PDB_SOURCE_LINE_WRITER_H_
 
 #include <atlcomcli.h>
 
-#include <hash_map>
 #include <string>
+#include <unordered_map>
 
+#include "common/windows/module_info.h"
 #include "common/windows/omap.h"
 
 struct IDiaEnumLineNumbers;
@@ -47,42 +48,7 @@ struct IDiaSymbol;
 namespace google_breakpad {
 
 using std::wstring;
-using stdext::hash_map;
-
-// A structure that carries information that identifies a pdb file.
-struct PDBModuleInfo {
- public:
-  // The basename of the pdb file from which information was loaded.
-  wstring debug_file;
-
-  // The pdb's identifier.  For recent pdb files, the identifier consists
-  // of the pdb's guid, in uppercase hexadecimal form without any dashes
-  // or separators, followed immediately by the pdb's age, also in
-  // uppercase hexadecimal form.  For older pdb files which have no guid,
-  // the identifier is the pdb's 32-bit signature value, in zero-padded
-  // hexadecimal form, followed immediately by the pdb's age, in lowercase
-  // hexadecimal form.
-  wstring debug_identifier;
-
-  // A string identifying the cpu that the pdb is associated with.
-  // Currently, this may be "x86" or "unknown".
-  wstring cpu;
-};
-
-// A structure that carries information that identifies a PE file,
-// either an EXE or a DLL.
-struct PEModuleInfo {
-  // The basename of the PE file.
-  wstring code_file;
-
-  // The PE file's code identifier, which consists of its timestamp
-  // and file size concatenated together into a single hex string.
-  // (The fields IMAGE_OPTIONAL_HEADER::SizeOfImage and
-  // IMAGE_FILE_HEADER::TimeDateStamp, as defined in the ImageHlp
-  // documentation.) This is not well documented, if it's documented
-  // at all, but it's what symstore does and what DbgHelp supports.
-  wstring code_identifier;
-};
+using std::unordered_map;
 
 class PDBSourceLineWriter {
  public:
@@ -99,19 +65,23 @@ class PDBSourceLineWriter {
   // file must be available; Open will be if it is not.
   // If there is already a pdb file open, it is automatically closed.
   // Returns true on success.
-  bool Open(const wstring &file, FileFormat format);
-
-  // Locates the pdb file for the given executable (exe or dll) file,
-  // and opens it.  If there is already a pdb file open, it is automatically
-  // closed.  Returns true on success.
-  bool OpenExecutable(const wstring &exe_file);
-
-  // Writes a map file from the current pdb file to the given file stream.
-  // Returns true on success.
-  bool WriteMap(FILE *map_file);
+  bool Open(const wstring& file, FileFormat format);
 
   // Closes the current pdb file and its associated resources.
   void Close();
+
+  // Sets the code file full path.  This is optional for 32-bit modules.  It is
+  // also optional for 64-bit modules when there is an executable file stored
+  // in the same directory as the PDB file.  It is only required for 64-bit
+  // modules when the executable file is not in the same location as the PDB
+  // file and it must be called after Open() and before WriteMap().
+  // If Open() was called for an executable file, then it is an error to call
+  // SetCodeFile() with a different file path and it will return false.
+  bool SetCodeFile(const wstring& exe_file);
+
+  // Writes a Breakpad symbol file from the current pdb file to |symbol_file|.
+  // Returns true on success.
+  bool WriteSymbols(FILE *symbol_file);
 
   // Retrieves information about the module's debugging file.  Returns
   // true on success and false on failure.
@@ -134,11 +104,12 @@ class PDBSourceLineWriter {
   bool PrintLines(IDiaEnumLineNumbers *lines);
 
   // Outputs a function address and name, followed by its source line list.
-  // block can be the same object as function, or it can be a reference
-  // to a code block that is lexically part of this function, but
-  // resides at a separate address.
-  // Returns true on success.
-  bool PrintFunction(IDiaSymbol *function, IDiaSymbol *block);
+  // block can be the same object as function, or it can be a reference to a
+  // code block that is lexically part of this function, but resides at a
+  // separate address. If has_multiple_symbols is true, this function's
+  // instructions correspond to multiple symbols. Returns true on success.
+  bool PrintFunction(IDiaSymbol *function, IDiaSymbol *block,
+                     bool has_multiple_symbols);
 
   // Outputs all functions as described above.  Returns true on success.
   bool PrintFunctions();
@@ -148,13 +119,25 @@ class PDBSourceLineWriter {
   bool PrintSourceFiles();
 
   // Outputs all of the frame information necessary to construct stack
+  // backtraces in the absence of frame pointers. For x86 data stored in
+  // .pdb files. Returns true on success.
+  bool PrintFrameDataUsingPDB();
+
+  // Outputs all of the frame information necessary to construct stack
+  // backtraces in the absence of frame pointers. For x64 data stored in
+  // .exe, .dll files. Returns true on success.
+  bool PrintFrameDataUsingEXE();
+
+  // Outputs all of the frame information necessary to construct stack
   // backtraces in the absence of frame pointers.  Returns true on success.
   bool PrintFrameData();
 
   // Outputs a single public symbol address and name, if the symbol corresponds
   // to a code address.  Returns true on success.  If symbol is does not
-  // correspond to code, returns true without outputting anything.
-  bool PrintCodePublicSymbol(IDiaSymbol *symbol);
+  // correspond to code, returns true without outputting anything. If
+  // has_multiple_symbols is true, the symbol corresponds to a code address and
+  // the instructions correspond to multiple symbols.
+  bool PrintCodePublicSymbol(IDiaSymbol *symbol, bool has_multiple_symbols);
 
   // Outputs a line identifying the PDB file that is being dumped, along with
   // its uuid and age.
@@ -167,34 +150,34 @@ class PDBSourceLineWriter {
 
   // Returns true if this filename has already been seen,
   // and an ID is stored for it, or false if it has not.
-  bool FileIDIsCached(const wstring &file) {
+  bool FileIDIsCached(const wstring& file) {
     return unique_files_.find(file) != unique_files_.end();
-  };
+  }
 
   // Cache this filename and ID for later reuse.
-  void CacheFileID(const wstring &file, DWORD id) {
+  void CacheFileID(const wstring& file, DWORD id) {
     unique_files_[file] = id;
-  };
+  }
 
   // Store this ID in the cache as a duplicate for this filename.
-  void StoreDuplicateFileID(const wstring &file, DWORD id) {
-    hash_map<wstring, DWORD>::iterator iter = unique_files_.find(file);
+  void StoreDuplicateFileID(const wstring& file, DWORD id) {
+    unordered_map<wstring, DWORD>::iterator iter = unique_files_.find(file);
     if (iter != unique_files_.end()) {
       // map this id to the previously seen one
       file_ids_[id] = iter->second;
     }
-  };
+  }
 
   // Given a file's unique ID, return the ID that should be used to
   // reference it. There may be multiple files with identical filenames
   // but different unique IDs. The cache attempts to coalesce these into
   // one ID per unique filename.
   DWORD GetRealFileID(DWORD id) {
-    hash_map<DWORD, DWORD>::iterator iter = file_ids_.find(id);
+    unordered_map<DWORD, DWORD>::iterator iter = file_ids_.find(id);
     if (iter == file_ids_.end())
       return id;
     return iter->second;
-  };
+  }
 
   // Find the PE file corresponding to the loaded PDB file, and
   // set the code_file_ member. Returns false on failure.
@@ -226,9 +209,9 @@ class PDBSourceLineWriter {
   // There may be many duplicate filenames with different IDs.
   // This maps from the DIA "unique ID" to a single ID per unique
   // filename.
-  hash_map<DWORD, DWORD> file_ids_;
+  unordered_map<DWORD, DWORD> file_ids_;
   // This maps unique filenames to file IDs.
-  hash_map<wstring, DWORD> unique_files_;
+  unordered_map<wstring, DWORD> unique_files_;
 
   // This is used for calculating post-transform symbol addresses and lengths.
   ImageMap image_map_;
@@ -240,4 +223,4 @@ class PDBSourceLineWriter {
 
 }  // namespace google_breakpad
 
-#endif  // _PDB_SOURCE_LINE_WRITER_H__
+#endif  // COMMON_WINDOWS_PDB_SOURCE_LINE_WRITER_H_

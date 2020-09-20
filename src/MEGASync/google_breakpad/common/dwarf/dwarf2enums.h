@@ -115,6 +115,16 @@ enum DwarfTag {
   DW_TAG_PGI_interface_block = 0xA020
 };
 
+enum DwarfUnitHeader {
+  DW_UT_compile = 0x01,
+  DW_UT_type = 0x02,
+  DW_UT_partial = 0x03,
+  DW_UT_skeleton = 0x04,
+  DW_UT_split_compile = 0x05,
+  DW_UT_split_type = 0x06,
+  DW_UT_lo_user = 0x80,
+  DW_UT_hi_user = 0xFF
+};
 
 enum DwarfHasChild {
   DW_children_no = 0,
@@ -149,7 +159,30 @@ enum DwarfForm {
   DW_FORM_sec_offset = 0x17,
   DW_FORM_exprloc = 0x18,
   DW_FORM_flag_present = 0x19,
-  DW_FORM_ref_sig8 = 0x20
+
+  // Added in DWARF 5:
+  DW_FORM_strx = 0x1a,
+  DW_FORM_strp_sup = 0x1d,
+  DW_FORM_line_strp = 0x1f,
+
+  // DWARF 4, but value out of order.
+  DW_FORM_ref_sig8 = 0x20,
+
+  // Added in DWARF 5:
+  DW_FORM_strx1 = 0x25,
+  DW_FORM_strx2 = 0x26,
+  DW_FORM_strx3 = 0x27,
+  DW_FORM_strx4 = 0x28,
+
+  DW_FORM_addrx = 0x1b,
+  DW_FORM_addrx1 = 0x29,
+  DW_FORM_addrx2 = 0x2a,
+  DW_FORM_addrx3 = 0x2b,
+  DW_FORM_addrx4 = 0x2c,
+
+  // Extensions for Fission.  See http://gcc.gnu.org/wiki/DebugFission.
+  DW_FORM_GNU_addr_index = 0x1f01,
+  DW_FORM_GNU_str_index = 0x1f02
 };
 
 // Attribute names and codes
@@ -229,6 +262,8 @@ enum DwarfAttribute {
   DW_AT_call_column   = 0x57,
   DW_AT_call_file     = 0x58,
   DW_AT_call_line     = 0x59,
+  // DWARF 4
+  DW_AT_linkage_name  = 0x6e,
   // SGI/MIPS extensions.
   DW_AT_MIPS_fde = 0x2001,
   DW_AT_MIPS_loop_begin = 0x2002,
@@ -264,6 +299,13 @@ enum DwarfAttribute {
   DW_AT_body_begin = 0x2105,
   DW_AT_body_end   = 0x2106,
   DW_AT_GNU_vector = 0x2107,
+  // Extensions for Fission.  See http://gcc.gnu.org/wiki/DebugFission.
+  DW_AT_GNU_dwo_name = 0x2130,
+  DW_AT_GNU_dwo_id = 0x2131,
+  DW_AT_GNU_ranges_base = 0x2132,
+  DW_AT_GNU_addr_base = 0x2133,
+  DW_AT_GNU_pubnames = 0x2134,
+  DW_AT_GNU_pubtypes = 0x2135,
   // VMS extensions.
   DW_AT_VMS_rtnbeg_pd_address = 0x2201,
   // UPC extension.
@@ -274,6 +316,14 @@ enum DwarfAttribute {
   DW_AT_PGI_lstride  = 0x3a02
 };
 
+// Line number content type codes (DWARF 5).
+enum DwarfLineNumberContentType {
+  DW_LNCT_path = 1,
+  DW_LNCT_directory_index = 2,
+  DW_LNCT_timestamp = 3,
+  DW_LNCT_size = 4,
+  DW_LNCT_MD5 = 5,
+};
 
 // Line number opcodes.
 enum DwarfLineNumberOps {
@@ -489,9 +539,24 @@ enum DwarfOpcode {
   DW_OP_call_frame_cfa               =0x9c,
   DW_OP_bit_piece                    =0x9d,
   DW_OP_lo_user                      =0xe0,
-  DW_OP_hi_user                      =0xff,  
+  DW_OP_hi_user                      =0xff,
   // GNU extensions
-  DW_OP_GNU_push_tls_address         =0xe0
+  DW_OP_GNU_push_tls_address         =0xe0,
+  // Extensions for Fission.  See http://gcc.gnu.org/wiki/DebugFission.
+  DW_OP_GNU_addr_index               =0xfb,
+  DW_OP_GNU_const_index              =0xfc
+};
+
+// Section identifiers for DWP files
+enum DwarfSectionId {
+  DW_SECT_INFO = 1,
+  DW_SECT_TYPES = 2,
+  DW_SECT_ABBREV = 3,
+  DW_SECT_LINE = 4,
+  DW_SECT_LOC = 5,
+  DW_SECT_STR_OFFSETS = 6,
+  DW_SECT_MACINFO = 7,
+  DW_SECT_MACRO = 8
 };
 
 // Source languages.  These are values for DW_AT_language.
@@ -517,6 +582,8 @@ enum DwarfLanguage
     DW_LANG_ObjC_plus_plus           =0x0011,
     DW_LANG_UPC                      =0x0012,
     DW_LANG_D                        =0x0013,
+    DW_LANG_Rust                     =0x001c,
+    DW_LANG_Swift                    =0x001e,
     // Implementation-defined language code range.
     DW_LANG_lo_user = 0x8000,
     DW_LANG_hi_user = 0xffff,
@@ -643,7 +710,7 @@ enum DwarfPointerEncoding
     // encoding (except DW_EH_PE_aligned), and indicates that the
     // encoded value represents the address at which the true address
     // is stored, not the true address itself.
-    DW_EH_PE_indirect	= 0x80  
+    DW_EH_PE_indirect	= 0x80
   };
 
 }  // namespace dwarf2reader

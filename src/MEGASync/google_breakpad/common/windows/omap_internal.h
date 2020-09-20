@@ -29,12 +29,13 @@
 // Declares internal implementation details for functionality in omap.h and
 // omap.cc.
 
-#ifndef COMMON_WINDOWS_OMAP_INTERNAL_H__
-#define COMMON_WINDOWS_OMAP_INTERNAL_H__
+#ifndef COMMON_WINDOWS_OMAP_INTERNAL_H_
+#define COMMON_WINDOWS_OMAP_INTERNAL_H_
 
 #include <windows.h>
 #include <dia2.h>
 
+#include <map>
 #include <vector>
 
 namespace google_breakpad {
@@ -130,8 +131,10 @@ struct ImageMap {
   // an interval in |mapping| that contains the endpoint. Useful for doing
   // interval intersection queries.
   EndpointIndexMap endpoint_index_map;
+
+  std::map<DWORD, DWORD> subsequent_rva_block;
 };
 
 }  // namespace google_breakpad
 
-#endif  // COMMON_WINDOWS_OMAP_INTERNAL_H__
+#endif  // COMMON_WINDOWS_OMAP_INTERNAL_H_

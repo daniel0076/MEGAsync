@@ -63,7 +63,7 @@ struct KeyValueMessageData {
  public:
   KeyValueMessageData() {}
   explicit KeyValueMessageData(
-      const google_breakpad::SimpleStringDictionary::Entry &inEntry) {
+      const google_breakpad::SimpleStringDictionary::Entry& inEntry) {
     strlcpy(key, inEntry.key, sizeof(key) );
     strlcpy(value, inEntry.value, sizeof(value) );
   }
@@ -80,7 +80,7 @@ namespace google_breakpad {
 //=============================================================================
 class MinidumpLocation {
  public:
-  MinidumpLocation(NSString *minidumpDir) {
+  MinidumpLocation(NSString* minidumpDir) {
     // Ensure that the path exists.  Fallback to /tmp if unable to locate path.
     assert(minidumpDir);
     if (!EnsureDirectoryPathExists(minidumpDir)) {
@@ -98,10 +98,10 @@ class MinidumpLocation {
       (MinidumpGenerator::UniqueNameInDirectory(dump_path, &next_minidump_id));
 
     strlcpy(minidump_id_, next_minidump_id.c_str(), sizeof(minidump_id_));
-  };
+  }
 
-  const char *GetPath() { return minidump_dir_path_; }
-  const char *GetID() { return minidump_id_; }
+  const char* GetPath() { return minidump_dir_path_; }
+  const char* GetID() { return minidump_id_; }
 
  private:
   char minidump_dir_path_[PATH_MAX];             // Path to minidump directory
@@ -111,12 +111,12 @@ class MinidumpLocation {
 //=============================================================================
 class Inspector {
  public:
-  Inspector() {};
+  Inspector() {}
 
   // given a bootstrap service name, receives mach messages
   // from a crashed process, then inspects it, creates a minidump file
   // and asks the user if he wants to upload it to a server.
-  void            Inspect(const char *receive_port_name);
+  void            Inspect(const char* receive_port_name);
 
  private:
   // The Inspector is invoked with its bootstrap port set to the bootstrap
@@ -131,14 +131,13 @@ class Inspector {
   // ServiceCheckOut.
   kern_return_t   ResetBootstrapPort();
 
-  kern_return_t   ServiceCheckIn(const char *receive_port_name);
-  kern_return_t   ServiceCheckOut(const char *receive_port_name);
+  kern_return_t   ServiceCheckIn(const char* receive_port_name);
+  kern_return_t   ServiceCheckOut(const char* receive_port_name);
 
   kern_return_t   ReadMessages();
 
   bool            InspectTask();
   kern_return_t   SendAcknowledgement();
-  void            LaunchReporter(const char *inConfigFilePath);
 
   // The bootstrap port in which the inspector is registered and into which it
   // must check in.

@@ -193,7 +193,7 @@ class BasicElf : public Test {};
 
 typedef Types<ElfClass32, ElfClass64> ElfClasses;
 
-TYPED_TEST_CASE(BasicElf, ElfClasses);
+TYPED_TEST_SUITE(BasicElf, ElfClasses);
 
 TYPED_TEST(BasicElf, EmptyLE) {
   typedef typename TypeParam::Ehdr Ehdr;
@@ -381,9 +381,9 @@ TEST_F(ElfNotesTest, Empty) {
 
 TEST_F(ElfNotesTest, Notes) {
   Notes notes(kLittleEndian);
-  notes.AddNote(1, "Linux", reinterpret_cast<const uint8_t *>("\x42\x02\0\0"),
+  notes.AddNote(1, "Linux", reinterpret_cast<const uint8_t*>("\x42\x02\0\0"),
                 4);
-  notes.AddNote(2, "a", reinterpret_cast<const uint8_t *>("foobar"),
+  notes.AddNote(2, "a", reinterpret_cast<const uint8_t*>("foobar"),
                 sizeof("foobar") - 1);
 
   const uint8_t kExpectedNotesContents[] = {

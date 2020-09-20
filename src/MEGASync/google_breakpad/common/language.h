@@ -74,12 +74,29 @@ class Language {
   // take into account the parent and child DIE types, allow languages
   // to use their own data type for complex parent names, etc. But if
   // C++ doesn't need all that, who would?
-  virtual string MakeQualifiedName (const string &parent_name,
-                                    const string &name) const = 0;
+  virtual string MakeQualifiedName (const string& parent_name,
+                                    const string& name) const = 0;
+
+  enum DemangleResult {
+    // Demangling was not performed because it’s not appropriate to attempt.
+    kDontDemangle = -1,
+
+    kDemangleSuccess,
+    kDemangleFailure,
+  };
+
+  // Wraps abi::__cxa_demangle() or similar for languages where appropriate.
+  virtual DemangleResult DemangleName(const string& mangled,
+                                      string* demangled) const {
+    demangled->clear();
+    return kDontDemangle;
+  }
 
   // Instances for specific languages.
   static const Language * const CPlusPlus,
                         * const Java,
+                        * const Swift,
+                        * const Rust,
                         * const Assembler;
 };
 

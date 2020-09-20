@@ -41,12 +41,14 @@ namespace google_breakpad {
 
 using dwarf2reader::DwarfPointerEncoding;
   
-CFISection &CFISection::CIEHeader(uint64_t code_alignment_factor,
+CFISection& CFISection::CIEHeader(uint64_t code_alignment_factor,
                                   int data_alignment_factor,
                                   unsigned return_address_register,
                                   uint8_t version,
-                                  const string &augmentation,
-                                  bool dwarf64) {
+                                  const string& augmentation,
+                                  bool dwarf64,
+                                  uint8_t address_size,
+                                  uint8_t segment_size) {
   assert(!entry_length_);
   entry_length_ = new PendingLength();
   in_fde_ = false;
@@ -63,6 +65,10 @@ CFISection &CFISection::CIEHeader(uint64_t code_alignment_factor,
   }
   D8(version);
   AppendCString(augmentation);
+  if (version >= 4) {
+    D8(address_size);
+    D8(segment_size);
+  }
   ULEB128(code_alignment_factor);
   LEB128(data_alignment_factor);
   if (version == 1)
@@ -72,7 +78,7 @@ CFISection &CFISection::CIEHeader(uint64_t code_alignment_factor,
   return *this;
 }
 
-CFISection &CFISection::FDEHeader(Label cie_pointer,
+CFISection& CFISection::FDEHeader(Label cie_pointer,
                                   uint64_t initial_location,
                                   uint64_t address_range,
                                   bool dwarf64) {
@@ -107,7 +113,7 @@ CFISection &CFISection::FDEHeader(Label cie_pointer,
   return *this;
 }
 
-CFISection &CFISection::FinishEntry() {
+CFISection& CFISection::FinishEntry() {
   assert(entry_length_);
   Align(address_size_, dwarf2reader::DW_CFA_nop);
   entry_length_->length = Here() - entry_length_->start;
@@ -117,9 +123,9 @@ CFISection &CFISection::FinishEntry() {
   return *this;
 }
 
-CFISection &CFISection::EncodedPointer(uint64_t address,
+CFISection& CFISection::EncodedPointer(uint64_t address,
                                        DwarfPointerEncoding encoding,
-                                       const EncodedPointerBases &bases) {
+                                       const EncodedPointerBases& bases) {
   // Omitted data is extremely easy to emit.
   if (encoding == dwarf2reader::DW_EH_PE_omit)
     return *this;

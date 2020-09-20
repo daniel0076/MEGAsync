@@ -47,6 +47,7 @@
 #include <vector>
 
 #include "common/byte_cursor.h"
+#include "common/mac/super_fat_arch.h"
 
 namespace google_breakpad {
 namespace mach_o {
@@ -77,7 +78,7 @@ class FatReader {
   class Reporter {
    public:
     // Create a reporter that attributes problems to |filename|.
-    explicit Reporter(const string &filename) : filename_(filename) { }
+    explicit Reporter(const string& filename) : filename_(filename) { }
 
     virtual ~Reporter() { }
 
@@ -93,15 +94,15 @@ class FatReader {
     // complete header, or the header implies that contents are present
     // beyond the actual end of the file.
     virtual void TooShort();
-  
+
    private:
     // The filename to which the reader should attribute problems.
     string filename_;
   };
 
   // Create a fat binary file reader that uses |reporter| to report problems.
-  explicit FatReader(Reporter *reporter) : reporter_(reporter) { }
-  
+  explicit FatReader(Reporter* reporter) : reporter_(reporter) { }
+
   // Read the |size| bytes at |buffer| as a fat binary file. On success,
   // return true; on failure, report the problem to reporter_ and return
   // false.
@@ -109,15 +110,15 @@ class FatReader {
   // If the data is a plain Mach-O file, rather than a fat binary file,
   // then the reader behaves as if it had found a fat binary file whose
   // single object file is the Mach-O file.
-  bool Read(const uint8_t *buffer, size_t size);
+  bool Read(const uint8_t* buffer, size_t size);
 
-  // Return an array of 'struct fat_arch' structures describing the
+  // Return an array of 'SuperFatArch' structures describing the
   // object files present in this fat binary file. Set |size| to the
   // number of elements in the array.
   //
-  // Assuming Read returned true, the entries are validated: it is
-  // safe to assume that the offsets and sizes in each 'struct
-  // fat_arch' refer to subranges of the bytes passed to Read.
+  // Assuming Read returned true, the entries are validated: it is safe to
+  // assume that the offsets and sizes in each SuperFatArch refer to subranges
+  // of the bytes passed to Read.
   //
   // If there are no object files in this fat binary, then this
   // function can return NULL.
@@ -129,7 +130,7 @@ class FatReader {
   // possible to use the result with OS X functions like NXFindBestFatArch,
   // so that the symbol dumper will behave consistently with other OS X
   // utilities that work with fat binaries.
-  const struct fat_arch *object_files(size_t *count) const { 
+  const SuperFatArch* object_files(size_t* count) const {
     *count = object_files_.size();
     if (object_files_.size() > 0)
       return &object_files_[0];
@@ -138,7 +139,7 @@ class FatReader {
 
  private:
   // We use this to report problems parsing the file's contents. (WEAK)
-  Reporter *reporter_;
+  Reporter* reporter_;
 
   // The contents of the fat binary or Mach-O file we're parsing. We do not
   // own the storage it refers to.
@@ -149,7 +150,7 @@ class FatReader {
 
   // The list of object files in this binary.
   // object_files_.size() == fat_header.nfat_arch
-  vector<struct fat_arch> object_files_;
+  vector<SuperFatArch> object_files_;
 };
 
 // A segment in a Mach-O file. All these fields have been byte-swapped as
@@ -174,10 +175,14 @@ struct Segment {
   // of this value are valid.
   uint64_t vmsize;
 
+  // The file offset and size of the segment in the Mach-O image.
+  uint64_t fileoff;
+  uint64_t filesize;
+
   // The maximum and initial VM protection of this segment's contents.
   uint32_t maxprot;
   uint32_t initprot;
-  
+
   // The number of sections in section_list.
   uint32_t nsects;
 
@@ -235,7 +240,7 @@ class Reader {
   class Reporter {
    public:
     // Create a reporter that attributes problems to |filename|.
-    explicit Reporter(const string &filename) : filename_(filename) { }
+    explicit Reporter(const string& filename) : filename_(filename) { }
     virtual ~Reporter() { }
 
     // Reporter functions for fatal errors return void; the reader will
@@ -277,16 +282,16 @@ class Reader {
     // The LC_SEGMENT or LC_SEGMENT_64 load command for the segment named
     // |name| is too short to hold the sections that its header says it does.
     // (This more specific than LoadCommandTooShort.)
-    virtual void SectionsMissing(const string &name);
+    virtual void SectionsMissing(const string& name);
 
     // The segment named |name| claims that its contents lie beyond the end
     // of the file.
-    virtual void MisplacedSegmentData(const string &name);
+    virtual void MisplacedSegmentData(const string& name);
 
     // The section named |section| in the segment named |segment| claims that
     // its contents do not lie entirely within the segment.
-    virtual void MisplacedSectionData(const string &section,
-                                      const string &segment);
+    virtual void MisplacedSectionData(const string& section,
+                                      const string& segment);
 
     // The LC_SYMTAB command claims that symbol table contents are located
     // beyond the end of the file.
@@ -310,7 +315,7 @@ class Reader {
     // Called to report that the segment's section list contains |section|.
     // This should return true if the iteration should continue, or false
     // if it should stop.
-    virtual bool HandleSection(const Section &section) = 0;
+    virtual bool HandleSection(const Section& section) = 0;
   };
 
   // A handler for the load commands in a Mach-O file.
@@ -336,20 +341,20 @@ class Reader {
     // cannot parse the command type or its size, we call
     // reporter_->IncompleteLoadCommand instead.)
     virtual bool UnknownCommand(LoadCommandType type,
-                                const ByteBuffer &contents) {
+                                const ByteBuffer& contents) {
       return true;
     }
 
     // The load command is LC_SEGMENT or LC_SEGMENT_64, defining a segment
     // with the properties given in |segment|.
-    virtual bool SegmentCommand(const Segment &segment) {
+    virtual bool SegmentCommand(const Segment& segment) {
       return true;
     }
 
     // The load command is LC_SYMTAB. |entries| holds the array of nlist
     // entries, and |names| holds the strings the entries refer to.
-    virtual bool SymtabCommand(const ByteBuffer &entries,
-                               const ByteBuffer &names) {
+    virtual bool SymtabCommand(const ByteBuffer& entries,
+                               const ByteBuffer& names) {
       return true;
     }
 
@@ -357,7 +362,7 @@ class Reader {
   };
 
   // Create a Mach-O file reader that reports problems to |reporter|.
-  explicit Reader(Reporter *reporter)
+  explicit Reader(Reporter* reporter)
       : reporter_(reporter) { }
 
   // Read the given data as a Mach-O file. The reader retains pointers
@@ -366,17 +371,17 @@ class Reader {
   //
   // At most one of these functions should be invoked once on each Reader
   // instance.
-  bool Read(const uint8_t *buffer,
+  bool Read(const uint8_t* buffer,
             size_t size,
             cpu_type_t expected_cpu_type,
             cpu_subtype_t expected_cpu_subtype);
-  bool Read(const ByteBuffer &buffer,
+  bool Read(const ByteBuffer& buffer,
             cpu_type_t expected_cpu_type,
             cpu_subtype_t expected_cpu_subtype) {
     return Read(buffer.start,
                 buffer.Size(),
                 expected_cpu_type,
-                expected_cpu_subtype); 
+                expected_cpu_subtype);
   }
 
   // Return this file's characteristics, as found in the Mach-O header.
@@ -397,25 +402,25 @@ class Reader {
   // a handler function returns false. If we encounter a malformed load
   // command, report it via reporter_ and return false. Return true if all
   // load commands were parseable and all handlers returned true.
-  bool WalkLoadCommands(LoadCommandHandler *handler) const;
+  bool WalkLoadCommands(LoadCommandHandler* handler) const;
 
   // Set |segment| to describe the segment named |name|, if present. If
   // found, |segment|'s byte buffers refer to a subregion of the bytes
   // passed to Read. If we find the section, return true; otherwise,
   // return false.
-  bool FindSegment(const string &name, Segment *segment) const;
+  bool FindSegment(const string& name, Segment* segment) const;
 
   // Apply |handler| to each section defined in |segment|. If |handler| returns
   // false, stop iterating and return false. If all calls to |handler| return
   // true and we reach the end of the section list, return true.
-  bool WalkSegmentSections(const Segment &segment, SectionHandler *handler)
+  bool WalkSegmentSections(const Segment& segment, SectionHandler* handler)
     const;
 
   // Clear |section_map| and then populate it with a map of the sections
   // in |segment|, from section names to Section structures.
   // Each Section's contents refer to bytes in |segment|'s contents.
   // On success, return true; if a problem occurs, report it and return false.
-  bool MapSegmentSections(const Segment &segment, SectionMap *section_map)
+  bool MapSegmentSections(const Segment& segment, SectionMap* section_map)
     const;
 
  private:
@@ -424,7 +429,7 @@ class Reader {
   class SectionMapper;
 
   // We use this to report problems parsing the file's contents. (WEAK)
-  Reporter *reporter_;
+  Reporter* reporter_;
 
   // The contents of the Mach-O file we're parsing. We do not own the
   // storage it refers to.

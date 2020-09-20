@@ -43,6 +43,8 @@
 
 #if defined(__ARM_EABI__)
 #define TID_PTR_REGISTER "r3"
+#elif defined(__aarch64__)
+#define TID_PTR_REGISTER "x3"
 #elif defined(__i386)
 #define TID_PTR_REGISTER "ecx"
 #elif defined(__x86_64)
@@ -53,22 +55,23 @@
 #error This test has not been ported to this platform.
 #endif
 
-void *thread_function(void *data) {
-  int pipefd = *static_cast<int *>(data);
-  volatile pid_t thread_id = syscall(__NR_gettid);
+void* thread_function(void* data) {
+  int pipefd = *static_cast<int*>(data);
+  volatile pid_t* thread_id = new pid_t;
+  *thread_id = syscall(__NR_gettid);
   // Signal parent that a thread has started.
   uint8_t byte = 1;
   if (write(pipefd, &byte, sizeof(byte)) != sizeof(byte)) {
     perror("ERROR: parent notification failed");
     return NULL;
   }
-  register volatile pid_t *thread_id_ptr asm(TID_PTR_REGISTER) = &thread_id;
+  register volatile pid_t* thread_id_ptr asm(TID_PTR_REGISTER) = thread_id;
   while (true)
     asm volatile ("" : : "r" (thread_id_ptr));
   return NULL;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   if (argc < 3) {
     fprintf(stderr,
             "usage: linux_dumper_unittest_helper <pipe fd> <# of threads>\n");

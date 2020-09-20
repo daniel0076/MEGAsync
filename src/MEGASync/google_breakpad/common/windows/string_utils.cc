@@ -35,7 +35,7 @@
 namespace google_breakpad {
 
 // static
-wstring WindowsStringUtils::GetBaseName(const wstring &filename) {
+wstring WindowsStringUtils::GetBaseName(const wstring& filename) {
   wstring base_name(filename);
   size_t slash_pos = base_name.find_last_of(L"/\\");
   if (slash_pos != wstring::npos) {
@@ -45,7 +45,7 @@ wstring WindowsStringUtils::GetBaseName(const wstring &filename) {
 }
 
 // static
-bool WindowsStringUtils::safe_mbstowcs(const string &mbs, wstring *wcs) {
+bool WindowsStringUtils::safe_mbstowcs(const string& mbs, wstring* wcs) {
   assert(wcs);
 
   // First, determine the length of the destination buffer.
@@ -58,7 +58,7 @@ bool WindowsStringUtils::safe_mbstowcs(const string &mbs, wstring *wcs) {
   }
   assert(wcs_length > 0);
 #else  // _MSC_VER >= 1400
-  if ((wcs_length = mbstowcs(NULL, mbs.c_str(), mbs.length())) < 0) {
+  if ((wcs_length = mbstowcs(NULL, mbs.c_str(), mbs.length())) == (size_t)-1) {
     return false;
   }
 
@@ -75,7 +75,7 @@ bool WindowsStringUtils::safe_mbstowcs(const string &mbs, wstring *wcs) {
     return false;
   }
 #else  // _MSC_VER >= 1400
-  if (mbstowcs(&wcs_v[0], mbs.c_str(), mbs.length()) < 0) {
+  if (mbstowcs(&wcs_v[0], mbs.c_str(), mbs.length()) == (size_t)-1) {
     return false;
   }
 
@@ -88,7 +88,7 @@ bool WindowsStringUtils::safe_mbstowcs(const string &mbs, wstring *wcs) {
 }
 
 // static
-bool WindowsStringUtils::safe_wcstombs(const wstring &wcs, string *mbs) {
+bool WindowsStringUtils::safe_wcstombs(const wstring& wcs, string* mbs) {
   assert(mbs);
 
   // First, determine the length of the destination buffer.
@@ -101,7 +101,7 @@ bool WindowsStringUtils::safe_wcstombs(const wstring &wcs, string *mbs) {
   }
   assert(mbs_length > 0);
 #else  // _MSC_VER >= 1400
-  if ((mbs_length = wcstombs(NULL, wcs.c_str(), wcs.length())) < 0) {
+  if ((mbs_length = wcstombs(NULL, wcs.c_str(), wcs.length())) == (size_t)-1) {
     return false;
   }
 
@@ -118,7 +118,7 @@ bool WindowsStringUtils::safe_wcstombs(const wstring &wcs, string *mbs) {
     return false;
   }
 #else  // _MSC_VER >= 1400
-  if (wcstombs(&mbs_v[0], wcs.c_str(), wcs.length()) < 0) {
+  if (wcstombs(&mbs_v[0], wcs.c_str(), wcs.length()) == (size_t)-1) {
     return false;
   }
 

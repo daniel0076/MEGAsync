@@ -44,16 +44,17 @@
 namespace google_breakpad {
 
 using std::dec;
-using std::endl;
 using std::hex;
 
 
-Module::Module(const string &name, const string &os,
-               const string &architecture, const string &id) :
+Module::Module(const string& name, const string& os,
+               const string& architecture, const string& id,
+               const string& code_id /* = "" */) :
     name_(name),
     os_(os),
     architecture_(architecture),
     id_(id),
+    code_id_(code_id),
     load_address_(0) { }
 
 Module::~Module() {
@@ -63,7 +64,7 @@ Module::~Module() {
        it != functions_.end(); ++it) {
     delete *it;
   }
-  for (vector<StackFrameEntry *>::iterator it = stack_frame_entries_.begin();
+  for (vector<StackFrameEntry*>::iterator it = stack_frame_entries_.begin();
        it != stack_frame_entries_.end(); ++it) {
     delete *it;
   }
@@ -75,29 +76,73 @@ void Module::SetLoadAddress(Address address) {
   load_address_ = address;
 }
 
-void Module::AddFunction(Function *function) {
+void Module::SetAddressRanges(const vector<Range>& ranges) {
+  address_ranges_ = ranges;
+}
+
+void Module::AddFunction(Function* function) {
   // FUNC lines must not hold an empty name, so catch the problem early if
   // callers try to add one.
   assert(!function->name.empty());
+
+  if (!AddressIsInModule(function->address)) {
+    return;
+  }
+
+  // FUNCs are better than PUBLICs as they come with sizes, so remove an extern
+  // with the same address if present.
+  Extern ext(function->address);
+  ExternSet::iterator it_ext = externs_.find(&ext);
+  if (it_ext == externs_.end() &&
+      architecture_ == "arm" &&
+      (function->address & 0x1) == 0) {
+    // ARM THUMB functions have bit 0 set. ARM64 does not have THUMB.
+    Extern arm_thumb_ext(function->address | 0x1);
+    it_ext = externs_.find(&arm_thumb_ext);
+  }
+  if (it_ext != externs_.end()) {
+    delete *it_ext;
+    externs_.erase(it_ext);
+  }
+#if _DEBUG
+  {
+    // There should be no other PUBLIC symbols that overlap with the function.
+    for (const Range& range : function->ranges) {
+      Extern debug_ext(range.address);
+      ExternSet::iterator it_debug = externs_.lower_bound(&ext);
+      assert(it_debug == externs_.end() ||
+             (*it_debug)->address >= range.address + range.size);
+    }
+  }
+#endif
+
   std::pair<FunctionSet::iterator,bool> ret = functions_.insert(function);
-  if (!ret.second) {
+  if (!ret.second && (*ret.first != function)) {
     // Free the duplicate that was not inserted because this Module
     // now owns it.
     delete function;
   }
 }
 
-void Module::AddFunctions(vector<Function *>::iterator begin,
-                          vector<Function *>::iterator end) {
-  for (vector<Function *>::iterator it = begin; it != end; ++it)
+void Module::AddFunctions(vector<Function*>::iterator begin,
+                          vector<Function*>::iterator end) {
+  for (vector<Function*>::iterator it = begin; it != end; ++it)
     AddFunction(*it);
 }
 
-void Module::AddStackFrameEntry(StackFrameEntry *stack_frame_entry) {
+void Module::AddStackFrameEntry(StackFrameEntry* stack_frame_entry) {
+  if (!AddressIsInModule(stack_frame_entry->address)) {
+    return;
+  }
+
   stack_frame_entries_.push_back(stack_frame_entry);
 }
 
-void Module::AddExtern(Extern *ext) {
+void Module::AddExtern(Extern* ext) {
+  if (!AddressIsInModule(ext->address)) {
+    return;
+  }
+
   std::pair<ExternSet::iterator,bool> ret = externs_.insert(ext);
   if (!ret.second) {
     // Free the duplicate that was not inserted because this Module
@@ -106,17 +151,17 @@ void Module::AddExtern(Extern *ext) {
   }
 }
 
-void Module::GetFunctions(vector<Function *> *vec,
-                          vector<Function *>::iterator i) {
+void Module::GetFunctions(vector<Function*>* vec,
+                          vector<Function*>::iterator i) {
   vec->insert(i, functions_.begin(), functions_.end());
 }
 
-void Module::GetExterns(vector<Extern *> *vec,
-                        vector<Extern *>::iterator i) {
+void Module::GetExterns(vector<Extern*>* vec,
+                        vector<Extern*>::iterator i) {
   vec->insert(i, externs_.begin(), externs_.end());
 }
 
-Module::File *Module::FindFile(const string &name) {
+Module::File* Module::FindFile(const string& name) {
   // A tricky bit here.  The key of each map entry needs to be a
   // pointer to the entry's File's name string.  This means that we
   // can't do the initial lookup with any operation that would create
@@ -130,8 +175,7 @@ Module::File *Module::FindFile(const string &name) {
   FileByNameMap::iterator destiny = files_.lower_bound(&name);
   if (destiny == files_.end()
       || *destiny->first != name) {  // Repeated string comparison, boo hoo.
-    File *file = new File;
-    file->name = name;
+    File* file = new File(name);
     file->source_id = -1;
     destiny = files_.insert(destiny,
                             FileByNameMap::value_type(&file->name, file));
@@ -139,23 +183,23 @@ Module::File *Module::FindFile(const string &name) {
   return destiny->second;
 }
 
-Module::File *Module::FindFile(const char *name) {
+Module::File* Module::FindFile(const char* name) {
   string name_string = name;
   return FindFile(name_string);
 }
 
-Module::File *Module::FindExistingFile(const string &name) {
+Module::File* Module::FindExistingFile(const string& name) {
   FileByNameMap::iterator it = files_.find(&name);
   return (it == files_.end()) ? NULL : it->second;
 }
 
-void Module::GetFiles(vector<File *> *vec) {
+void Module::GetFiles(vector<File*>* vec) {
   vec->clear();
   for (FileByNameMap::iterator it = files_.begin(); it != files_.end(); ++it)
     vec->push_back(it->second);
 }
 
-void Module::GetStackFrameEntries(vector<StackFrameEntry *> *vec) {
+void Module::GetStackFrameEntries(vector<StackFrameEntry*>* vec) const {
   *vec = stack_frame_entries_;
 }
 
@@ -170,7 +214,7 @@ void Module::AssignSourceIds() {
   // info, by setting each one's source id to zero.
   for (FunctionSet::const_iterator func_it = functions_.begin();
        func_it != functions_.end(); ++func_it) {
-    Function *func = *func_it;
+    Function* func = *func_it;
     for (vector<Line>::iterator line_it = func->lines.begin();
          line_it != func->lines.end(); ++line_it)
       line_it->file->source_id = 0;
@@ -194,7 +238,7 @@ bool Module::ReportError() {
   return false;
 }
 
-bool Module::WriteRuleMap(const RuleMap &rule_map, std::ostream &stream) {
+bool Module::WriteRuleMap(const RuleMap& rule_map, std::ostream& stream) {
   for (RuleMap::const_iterator it = rule_map.begin();
        it != rule_map.end(); ++it) {
     if (it != rule_map.begin())
@@ -204,11 +248,28 @@ bool Module::WriteRuleMap(const RuleMap &rule_map, std::ostream &stream) {
   return stream.good();
 }
 
-bool Module::Write(std::ostream &stream, SymbolData symbol_data) {
+bool Module::AddressIsInModule(Address address) const {
+  if (address_ranges_.empty()) {
+    return true;
+  }
+  for (const auto& segment : address_ranges_) {
+    if (address >= segment.address &&
+        address < segment.address + segment.size) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool Module::Write(std::ostream& stream, SymbolData symbol_data) {
   stream << "MODULE " << os_ << " " << architecture_ << " "
-         << id_ << " " << name_ << endl;
+         << id_ << " " << name_ << "\n";
   if (!stream.good())
     return ReportError();
+
+  if (!code_id_.empty()) {
+    stream << "INFO CODE_ID " << code_id_ << "\n";
+  }
 
   if (symbol_data != ONLY_CFI) {
     AssignSourceIds();
@@ -216,9 +277,9 @@ bool Module::Write(std::ostream &stream, SymbolData symbol_data) {
     // Write out files.
     for (FileByNameMap::iterator file_it = files_.begin();
          file_it != files_.end(); ++file_it) {
-      File *file = file_it->second;
+      File* file = file_it->second;
       if (file->source_id >= 0) {
-        stream << "FILE " << file->source_id << " " <<  file->name << endl;
+        stream << "FILE " << file->source_id << " " <<  file->name << "\n";
         if (!stream.good())
           return ReportError();
       }
@@ -227,44 +288,53 @@ bool Module::Write(std::ostream &stream, SymbolData symbol_data) {
     // Write out functions and their lines.
     for (FunctionSet::const_iterator func_it = functions_.begin();
          func_it != functions_.end(); ++func_it) {
-      Function *func = *func_it;
-      stream << "FUNC " << hex
-             << (func->address - load_address_) << " "
-             << func->size << " "
-             << func->parameter_size << " "
-             << func->name << dec << endl;
-      if (!stream.good())
-        return ReportError();
+      Function* func = *func_it;
+      vector<Line>::iterator line_it = func->lines.begin();
+      for (auto range_it = func->ranges.cbegin();
+           range_it != func->ranges.cend(); ++range_it) {
+        stream << "FUNC " << hex
+               << (range_it->address - load_address_) << " "
+               << range_it->size << " "
+               << func->parameter_size << " "
+               << func->name << dec << "\n";
 
-      for (vector<Line>::iterator line_it = func->lines.begin();
-           line_it != func->lines.end(); ++line_it) {
-        stream << hex
-               << (line_it->address - load_address_) << " "
-               << line_it->size << " "
-               << dec
-               << line_it->number << " "
-               << line_it->file->source_id << endl;
         if (!stream.good())
           return ReportError();
+
+        while ((line_it != func->lines.end()) &&
+               (line_it->address >= range_it->address) &&
+               (line_it->address < (range_it->address + range_it->size))) {
+          stream << hex
+                 << (line_it->address - load_address_) << " "
+                 << line_it->size << " "
+                 << dec
+                 << line_it->number << " "
+                 << line_it->file->source_id << "\n";
+
+          if (!stream.good())
+            return ReportError();
+
+          ++line_it;
+        }
       }
     }
 
     // Write out 'PUBLIC' records.
     for (ExternSet::const_iterator extern_it = externs_.begin();
          extern_it != externs_.end(); ++extern_it) {
-      Extern *ext = *extern_it;
+      Extern* ext = *extern_it;
       stream << "PUBLIC " << hex
              << (ext->address - load_address_) << " 0 "
-             << ext->name << dec << endl;
+             << ext->name << dec << "\n";
     }
   }
 
   if (symbol_data != NO_CFI) {
     // Write out 'STACK CFI INIT' and 'STACK CFI' records.
-    vector<StackFrameEntry *>::const_iterator frame_it;
+    vector<StackFrameEntry*>::const_iterator frame_it;
     for (frame_it = stack_frame_entries_.begin();
          frame_it != stack_frame_entries_.end(); ++frame_it) {
-      StackFrameEntry *entry = *frame_it;
+      StackFrameEntry* entry = *frame_it;
       stream << "STACK CFI INIT " << hex
              << (entry->address - load_address_) << " "
              << entry->size << " " << dec;
@@ -272,7 +342,7 @@ bool Module::Write(std::ostream &stream, SymbolData symbol_data) {
           || !WriteRuleMap(entry->initial_rules, stream))
         return ReportError();
 
-      stream << endl;
+      stream << "\n";
 
       // Write out this entry's delta rules as 'STACK CFI' records.
       for (RuleChangeMap::const_iterator delta_it = entry->rule_changes.begin();
@@ -283,7 +353,7 @@ bool Module::Write(std::ostream &stream, SymbolData symbol_data) {
             || !WriteRuleMap(delta_it->second, stream))
           return ReportError();
 
-        stream << endl;
+        stream << "\n";
       }
     }
   }

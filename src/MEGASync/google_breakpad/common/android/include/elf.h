@@ -38,7 +38,7 @@ extern "C" {
 #endif  // __cplusplus
 
 // The Android <elf.h> provides BSD-based definitions for the ElfXX_Nhdr
-// types 
+// types
 // always source-compatible with the GLibc/kernel ones. To overcome this
 // issue without modifying a lot of code in Breakpad, use an ugly macro
 // renaming trick with #include_next
@@ -108,12 +108,6 @@ typedef struct {
   } d_un;
 } Elf64_Dyn;
 
-
-// __WORDSIZE is GLibc-specific and used by Google Breakpad on Linux.
-// All Android platforms are 32-bit for now.
-#ifndef __WORDSIZE
-#define __WORDSIZE 32
-#endif
 
 // The Android headers don't always define this constant.
 #ifndef EM_X86_64

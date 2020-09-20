@@ -45,7 +45,7 @@ namespace google_breakpad {
 
 // Demangle using abi call.
 // Older GCC may not support it.
-static string Demangle(const string &mangled) {
+static string Demangle(const string& mangled) {
   int status = 0;
   char *demangled = abi::__cxa_demangle(mangled.c_str(), NULL, NULL, &status);
   if (status == 0 && demangled != NULL) {
@@ -58,7 +58,7 @@ static string Demangle(const string &mangled) {
 
 StabsToModule::~StabsToModule() {
   // Free any functions we've accumulated but not added to the module.
-  for (vector<Module::Function *>::const_iterator func_it = functions_.begin();
+  for (vector<Module::Function*>::const_iterator func_it = functions_.begin();
        func_it != functions_.end(); func_it++)
     delete *func_it;
   // Free any function that we're currently within.
@@ -87,13 +87,12 @@ bool StabsToModule::EndCompilationUnit(uint64_t address) {
   return true;
 }
 
-bool StabsToModule::StartFunction(const string &name,
+bool StabsToModule::StartFunction(const string& name,
                                   uint64_t address) {
   assert(!current_function_);
-  Module::Function *f = new Module::Function;
-  f->name = Demangle(name);
-  f->address = address;
-  f->size = 0;           // We compute this in StabsToModule::Finalize().
+  Module::Function *f = new Module::Function(Demangle(name), address);
+  Module::Range r(address, 0); // We compute this in StabsToModule::Finalize().
+  f->ranges.push_back(r);
   f->parameter_size = 0; // We don't provide this information.
   current_function_ = f;
   boundaries_.push_back(static_cast<Module::Address>(address));
@@ -132,8 +131,8 @@ bool StabsToModule::Line(uint64_t address, const char *name, int number) {
   return true;
 }
 
-bool StabsToModule::Extern(const string &name, uint64_t address) {
-  Module::Extern *ext = new Module::Extern;
+bool StabsToModule::Extern(const string& name, uint64_t address) {
+  Module::Extern *ext = new Module::Extern(address);
   // Older libstdc++ demangle implementations can crash on unexpected
   // input, so be careful about what gets passed in.
   if (name.compare(0, 3, "__Z") == 0) {
@@ -143,7 +142,6 @@ bool StabsToModule::Extern(const string &name, uint64_t address) {
   } else {
     ext->name = name;
   }
-  ext->address = address;
   module_->AddExtern(ext);
   return true;
 }
@@ -162,7 +160,7 @@ void StabsToModule::Finalize() {
   sort(functions_.begin(), functions_.end(),
        Module::Function::CompareByAddress);
 
-  for (vector<Module::Function *>::const_iterator func_it = functions_.begin();
+  for (vector<Module::Function*>::const_iterator func_it = functions_.begin();
        func_it != functions_.end();
        func_it++) {
     Module::Function *f = *func_it;
@@ -170,14 +168,14 @@ void StabsToModule::Finalize() {
     vector<Module::Address>::const_iterator boundary
         = std::upper_bound(boundaries_.begin(), boundaries_.end(), f->address);
     if (boundary != boundaries_.end())
-      f->size = *boundary - f->address;
+      f->ranges[0].size = *boundary - f->address;
     else
       // If this is the last function in the module, and the STABS
       // reader was unable to give us its ending address, then assign
       // it a bogus, very large value.  This will happen at most once
       // per module: since we've added all functions' addresses to the
       // boundary table, only one can be the last.
-      f->size = kFallbackSize;
+      f->ranges[0].size = kFallbackSize;
 
     // Compute sizes for each of the function f's lines --- if it has any.
     if (!f->lines.empty()) {
@@ -188,7 +186,8 @@ void StabsToModule::Finalize() {
            line_it != last_line; line_it++)
         line_it[0].size = line_it[1].address - line_it[0].address;
       // Compute the size of the last line from f's end address.
-      last_line->size = (f->address + f->size) - last_line->address;
+      last_line->size =
+        (f->ranges[0].address + f->ranges[0].size) - last_line->address;
     }
   }
   // Now that everything has a size, add our functions to the module, and

@@ -28,7 +28,7 @@
 
 {
   'includes': [
-    '../../client/windows/build/common.gypi',
+    '../../build/common.gypi',
   ],
   'targets': [
     {
@@ -37,14 +37,32 @@
       'all_dependent_settings': {
         'include_dirs': [
           '<(DEPTH)',
-          '$(VSInstallDir)\DIA SDK\include',
+          '$(VSInstallDir)/DIA SDK/include',
         ],
         'msvs_settings': {
           'VCLinkerTool': {
             'AdditionalDependencies': [
-              '$(VSInstallDir)\DIA SDK\lib\diaguids.lib',
+              'diaguids.lib',
               'imagehlp.lib',
             ],
+          },
+        },
+        'configurations': {
+          'x86_Base': {
+            'msvs_settings': {
+              'VCLinkerTool': {
+                'AdditionalLibraryDirectories':
+                  ['$(VSInstallDir)/DIA SDK/lib'],
+              },
+            },
+          },
+          'x64_Base': {
+            'msvs_settings': {
+              'VCLinkerTool': {
+                'AdditionalLibraryDirectories':
+                  ['$(VSInstallDir)/DIA SDK/lib/amd64'],
+              },
+            },
           },
         },
       },
@@ -59,13 +77,20 @@
         'guid_string.h',
         'http_upload.cc',
         'http_upload.h',
+        'module_info.h',
         'omap.cc',
         'omap.h',
         'omap_internal.h',
         'pdb_source_line_writer.cc',
         'pdb_source_line_writer.h',
+        'pe_source_line_writer.cc',
+        'pe_source_line_writer.h',
+        'pe_util.h',
+        'pe_util.cc',
         'string_utils.cc',
         'string_utils-inl.h',
+        'symbol_collector_client.cc',
+        'symbol_collector_client.h',
       ],
       'dependencies': [
         'dia_sdk',
